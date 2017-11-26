@@ -1,0 +1,8 @@
+bluelens-log==1.0.1
+bluelens-spawning-pool==1.0.9
+certifi==2017.11.5
+python-dateutil==2.6.1
+redis==2.10.6
+six==1.11.0
+stylelens-product==1.0.10
+urllib3==1.22
