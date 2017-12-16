@@ -67,10 +67,10 @@ def process_image(p_data):
 
 def make_mobile_image(image_name, type, image_path):
 
-  if type == 'full':
-    basewidth = MOBILE_FULL_WIDTH
-  else:
+  if type == 'thumb':
     basewidth = MOBILE_THUMBNAIL_WIDTH
+  else:
+    basewidth = MOBILE_FULL_WIDTH
 
   try:
     f = urllib.request.urlopen(image_path)
