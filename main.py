@@ -82,12 +82,17 @@ def make_mobile_image(image_name, type, image_path):
     file_url = save_mobile_image_to_storage(image_name, type)
     return file_url
   except Exception as e:
+    log.error('url:' + image_path)
     log.error(str(e))
-    exit()
+    delete_pod()
 
 def make_mobile_images(product_dic):
   full_image = make_mobile_image(product_dic['id'], 'full', product_dic['main_image'])
+  if full_image == None:
+    return
   thumb_image = make_mobile_image(product_dic['id'], 'thumb', product_dic['main_image'])
+  if thumb_image == None:
+    return
 
   sub_images = []
   for sub_img in product_dic['sub_images']:
@@ -150,17 +155,19 @@ def save_object_to_db(obj):
     api_response = object_api.add_object(obj)
     log.debug(api_response)
   except ApiException as e:
-    log.warn("Exception when calling ObjectApi->add_object: %s\n" % e)
+    log.error("Exception when calling ObjectApi->add_object: %s\n" % e)
 
   return api_response.data.object_id
 
 def update_product_to_db(product):
   log.debug('update_product_to_db')
   try:
+    log.debug('product_api host:' + product_api.api_client.host)
+    log.debug(product)
     api_response = product_api.update_product_by_id(product.id, product)
     log.debug(api_response)
   except ApiException as e:
-    log.warn("Exception when calling ProductApi->update_product_by_id: %s\n" % e)
+    log.error("Exception when calling ProductApi->update_product_by_id: %s\n" % e)
 
 def check_health():
   global  heart_bit
@@ -169,9 +176,9 @@ def check_health():
     heart_bit = False
     Timer(HEALTH_CHECK_TIME, check_health, ()).start()
   else:
-    exit()
+    delete_pod()
 
-def exit():
+def delete_pod():
   log.info('exit: ' + SPAWN_ID)
 
   data = {}
@@ -208,4 +215,4 @@ if __name__ == '__main__':
     Process(target=dispatch_job, args=(rconn,)).start()
   except Exception as e:
     log.error(str(e))
-    exit()
+    delete_pod()
