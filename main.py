@@ -2,18 +2,13 @@ from __future__ import print_function
 
 import os
 import time
-from multiprocessing import Process
 from threading import Timer
 import urllib.request
 from PIL import Image
 import pickle
 import uuid
 from bluelens_spawning_pool import spawning_pool
-from stylelens_product import Product
-from stylelens_product import Object
-from stylelens_product import ProductApi
-from stylelens_product import ObjectApi
-from stylelens_product.rest import ApiException
+from stylelens_product.products import Products
 from util import s3
 import redis
 
@@ -49,8 +44,7 @@ options = {
   'REDIS_PASSWORD': REDIS_PASSWORD
 }
 log = Logging(options, tag='bl-image-processor')
-product_api = ProductApi()
-object_api = ObjectApi()
+product_api = Products()
 rconn = redis.StrictRedis(REDIS_SERVER, port=6379, password=REDIS_PASSWORD)
 
 storage = s3.S3(AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
@@ -62,8 +56,6 @@ def process_image(p_data):
   product = pickle.loads(p_data)
 
   make_mobile_images(product)
-
-  # save_main_image_as_object(product)
 
 def make_mobile_image(image_name, type, image_path):
 
@@ -82,35 +74,29 @@ def make_mobile_image(image_name, type, image_path):
     file_url = save_mobile_image_to_storage(image_name, type)
     return file_url
   except Exception as e:
-    log.error('url:' + image_path)
+    log.error('url:' + str(image_path))
     log.error(str(e))
-    delete_pod()
 
-def make_mobile_images(product_dic):
-  full_image = make_mobile_image(product_dic['id'], 'full', product_dic['main_image'])
+def make_mobile_images(product):
+  full_image = make_mobile_image(str(product['_id']), 'full', product['main_image'])
   if full_image == None:
     return
-  thumb_image = make_mobile_image(product_dic['id'], 'thumb', product_dic['main_image'])
+  thumb_image = make_mobile_image(str(product['_id']), 'thumb', product['main_image'])
   if thumb_image == None:
     return
 
   sub_images = []
-  for sub_img in product_dic['sub_images']:
+  for sub_img in product['sub_images']:
     sub_image = make_mobile_image(str(uuid.uuid4()), 'sub', sub_img)
     sub_images.append(sub_image)
 
-  product = Product()
-  product.id = product_dic['id']
-  product.main_image_mobile_full = full_image
-  product.main_image_mobile_thumb = thumb_image
-  product.sub_images_mobile = sub_images
+  product['main_image_mobile_full'] = full_image
+  product['main_image_mobile_thumb'] = thumb_image
+  product['sub_images_mobile'] = sub_images
   update_product_to_db(product)
 
-  product_dic['main_image_mobile_full'] = full_image
-  product_dic['main_image_mobile_thumb'] = thumb_image
-  product_dic['sub_images_mobile'] = sub_images
-  rconn.lpush(REDIS_PRODUCT_CLASSIFY_QUEUE, pickle.dumps(product_dic))
-  rconn.hset(REDIS_PRODUCT_HASH, product.id, pickle.dumps(product_dic))
+  rconn.lpush(REDIS_PRODUCT_CLASSIFY_QUEUE, pickle.dumps(product))
+  rconn.hset(REDIS_PRODUCT_HASH, str(product['_id']), pickle.dumps(product))
 
 def save_mobile_image_to_storage(name, path):
   log.debug('save_mobile_image_to_storage')
@@ -121,52 +107,12 @@ def save_mobile_image_to_storage(name, path):
   log.info(file_url)
   return file_url
 
-def save_main_image_as_object(product):
-  log.info('save_main_image_as_object')
-  image_path = product['main_image']
-  try:
-    f = urllib.request.urlopen(image_path)
-  except Exception as e:
-    log.error(str(e))
-    return
-  im = Image.open(f).convert('RGB')
-  size = OBJECT_IMAGE_WIDTH, OBJECT_IMAGE_HEITH
-  im.thumbnail(size, Image.ANTIALIAS)
-
-  object = Object()
-  object.product_id = product['id']
-  object.storage = 's3'
-  object.bucket = AWS_OBJ_IMAGE_BUCKET
-  object.class_code = '0'
-  id = save_object_to_db(object)
-  im.save(id + '.jpg')
-
-  object.name = id
-  save_to_storage(object)
-  push_object_to_queue(object)
-
-def push_object_to_queue(obj):
-  log.info('push_object_to_queue')
-  rconn.lpush(REDIS_OBJECT_INDEX_QUEUE, pickle.dumps(obj.to_dict(), protocol=2))
-
-def save_object_to_db(obj):
-  log.info('save_object_to_db')
-  try:
-    api_response = object_api.add_object(obj)
-    log.debug(api_response)
-  except ApiException as e:
-    log.error("Exception when calling ObjectApi->add_object: %s\n" % e)
-
-  return api_response.data.object_id
-
 def update_product_to_db(product):
   log.debug('update_product_to_db')
   try:
-    log.debug('product_api host:' + product_api.api_client.host)
-    log.debug(product)
-    api_response = product_api.update_product_by_id(product.id, product)
+    api_response = product_api.update_product_by_id(str(product['_id']), product)
     log.debug(api_response)
-  except ApiException as e:
+  except Exception as e:
     log.error("Exception when calling ProductApi->update_product_by_id: %s\n" % e)
 
 def check_health():
@@ -189,14 +135,6 @@ def delete_pod():
   spawn.setServerPassword(REDIS_PASSWORD)
   spawn.delete(data)
 
-def save_to_storage(obj):
-  log.debug('save_to_storage')
-  file = obj.name + '.jpg'
-  key = os.path.join(RELEASE_MODE, obj.class_code, obj.name + '.jpg')
-  is_public = True
-  storage.upload_file_to_bucket(AWS_OBJ_IMAGE_BUCKET, file, key, is_public=is_public)
-  log.debug('save_to_storage done')
-
 def dispatch_job(rconn):
   log.info('Start dispatch_job')
   Timer(HEALTH_CHECK_TIME, check_health, ()).start()
@@ -210,9 +148,9 @@ def dispatch_job(rconn):
     heart_bit = True
 
 if __name__ == '__main__':
-  log.info('Start bl-image-processor')
+  log.info('Start bl-image-processor:3')
   try:
-    Process(target=dispatch_job, args=(rconn,)).start()
+    dispatch_job(rconn)
   except Exception as e:
     log.error(str(e))
     delete_pod()
