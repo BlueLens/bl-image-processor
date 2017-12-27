@@ -36,7 +36,7 @@ AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY'].replace('"', '')
 
 REDIS_PRODUCT_CLASSIFY_QUEUE = 'bl:product:classify:queue'
 REDIS_OBJECT_INDEX_QUEUE = 'bl:object:index:queue'
-REDIS_PRODUCT_HASH = 'bl:product:hash'
+# REDIS_PRODUCT_HASH = 'bl:product:hash'
 REDIS_PRODUCT_IMAGE_PROCESS_QUEUE = 'bl:product:image:process:queue'
 
 options = {
@@ -74,8 +74,7 @@ def make_mobile_image(image_name, type, image_path):
     file_url = save_mobile_image_to_storage(image_name, type)
     return file_url
   except Exception as e:
-    log.error('url:' + str(image_path))
-    log.error(str(e))
+    log.error('url open error')
 
 def make_mobile_images(product):
   full_image = make_mobile_image(str(product['_id']), 'full', product['main_image'])
@@ -93,10 +92,10 @@ def make_mobile_images(product):
   product['main_image_mobile_full'] = full_image
   product['main_image_mobile_thumb'] = thumb_image
   product['sub_images_mobile'] = sub_images
+  product['is_processed']= True
   update_product_to_db(product)
 
   rconn.lpush(REDIS_PRODUCT_CLASSIFY_QUEUE, pickle.dumps(product))
-  rconn.hset(REDIS_PRODUCT_HASH, str(product['_id']), pickle.dumps(product))
 
 def save_mobile_image_to_storage(name, path):
   log.debug('save_mobile_image_to_storage')
@@ -148,9 +147,12 @@ def dispatch_job(rconn):
     heart_bit = True
 
 if __name__ == '__main__':
-  log.info('Start bl-image-processor:3')
+  log.info('Start bl-image-processor:6')
   try:
     dispatch_job(rconn)
   except Exception as e:
     log.error(str(e))
     delete_pod()
+
+
+  # delete_pod()
