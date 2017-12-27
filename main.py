@@ -23,6 +23,8 @@ OBJECT_IMAGE_HEITH = 300
 MOBILE_FULL_WIDTH = 375
 MOBILE_THUMBNAIL_WIDTH = 200
 
+MAX_PROCESS_NUM = 500
+
 HEALTH_CHECK_TIME = 300
 TMP_MOBILE_IMG = 'tmp_mobile_full.jpg'
 TMP_MOBILE_THUMB_IMG = 'tmp_mobile_thumb.jpg'
@@ -137,17 +139,25 @@ def delete_pod():
 def dispatch_job(rconn):
   log.info('Start dispatch_job')
   Timer(HEALTH_CHECK_TIME, check_health, ()).start()
+
+  count = 0
   while True:
     key, value = rconn.blpop([REDIS_PRODUCT_IMAGE_PROCESS_QUEUE])
     start_time = time.time()
     process_image(value)
+    count = count + 1
+
     elapsed_time = time.time() - start_time
     log.info('image-processing time: ' + str(elapsed_time))
+
+    if count > MAX_PROCESS_NUM:
+      delete_pod()
+
     global  heart_bit
     heart_bit = True
 
 if __name__ == '__main__':
-  log.info('Start bl-image-processor:6')
+  log.info('Start bl-image-processor:7')
   try:
     dispatch_job(rconn)
   except Exception as e:
