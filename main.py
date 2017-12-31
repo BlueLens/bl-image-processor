@@ -23,7 +23,7 @@ OBJECT_IMAGE_HEITH = 300
 MOBILE_FULL_WIDTH = 375
 MOBILE_THUMBNAIL_WIDTH = 200
 
-MAX_PROCESS_NUM = 500
+MAX_PROCESS_NUM = 500000
 
 HEALTH_CHECK_TIME = 300
 TMP_MOBILE_IMG = 'tmp_mobile_full.jpg'
@@ -67,6 +67,7 @@ def make_mobile_image(image_name, type, image_path):
     basewidth = MOBILE_FULL_WIDTH
 
   try:
+    # f = urllib.urlopen(urllib.quote(image_path.encode('utf8'), '/:'))
     f = urllib.request.urlopen(image_path)
     im = Image.open(f).convert('RGB')
     wpercent = (basewidth / float(im.size[0]))
@@ -77,6 +78,7 @@ def make_mobile_image(image_name, type, image_path):
     return file_url
   except Exception as e:
     log.error('url open error')
+    return None
 
 def make_mobile_images(product):
   full_image = make_mobile_image(str(product['_id']), 'full', product['main_image'])
@@ -89,15 +91,14 @@ def make_mobile_images(product):
   sub_images = []
   for sub_img in product['sub_images']:
     sub_image = make_mobile_image(str(uuid.uuid4()), 'sub', sub_img)
-    sub_images.append(sub_image)
+    if sub_image is not None:
+      sub_images.append(sub_image)
 
   product['main_image_mobile_full'] = full_image
   product['main_image_mobile_thumb'] = thumb_image
   product['sub_images_mobile'] = sub_images
   product['is_processed']= True
   update_product_to_db(product)
-
-  rconn.lpush(REDIS_PRODUCT_CLASSIFY_QUEUE, pickle.dumps(product))
 
 def save_mobile_image_to_storage(name, path):
   log.debug('save_mobile_image_to_storage')
