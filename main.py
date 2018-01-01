@@ -20,10 +20,9 @@ AWS_MOBILE_IMAGE_BUCKET = 'bluelens-style-mainimage'
 
 OBJECT_IMAGE_WIDTH = 300
 OBJECT_IMAGE_HEITH = 300
-MOBILE_FULL_WIDTH = 375
+MOBILE_FULL_WIDTH = 380
 MOBILE_THUMBNAIL_WIDTH = 200
 
-MAX_PROCESS_NUM = 500000
 
 HEALTH_CHECK_TIME = 300
 TMP_MOBILE_IMG = 'tmp_mobile_full.jpg'
@@ -35,6 +34,8 @@ REDIS_PASSWORD = os.environ['REDIS_PASSWORD']
 RELEASE_MODE = os.environ['RELEASE_MODE']
 AWS_ACCESS_KEY = os.environ['AWS_ACCESS_KEY'].replace('"', '')
 AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY'].replace('"', '')
+
+MAX_PROCESS_NUM = int(os.environ['MAX_PROCESS_NUM'])
 
 REDIS_PRODUCT_CLASSIFY_QUEUE = 'bl:product:classify:queue'
 REDIS_OBJECT_INDEX_QUEUE = 'bl:object:index:queue'
@@ -106,7 +107,7 @@ def save_mobile_image_to_storage(name, path):
   key = os.path.join(RELEASE_MODE, 'mobile', path, name + '.jpg')
   is_public = True
   file_url = storage.upload_file_to_bucket(AWS_MOBILE_IMAGE_BUCKET, file, key, is_public=is_public)
-  log.info(file_url)
+  #log.info(file_url)
   return file_url
 
 def update_product_to_db(product):
@@ -158,12 +159,9 @@ def dispatch_job(rconn):
     heart_bit = True
 
 if __name__ == '__main__':
-  log.info('Start bl-image-processor:7')
   try:
+    log.info('Start bl-image-processor:7')
     dispatch_job(rconn)
   except Exception as e:
     log.error(str(e))
     delete_pod()
-
-
-  # delete_pod()
