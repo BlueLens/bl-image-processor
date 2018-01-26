@@ -12,5 +12,5 @@ python-dateutil==2.6.1
 redis==2.10.6
 s3transfer==0.1.11
 six==1.11.0
-stylelens-product==1.0.32
+stylelens-product==1.0.55
 urllib3==1.22
