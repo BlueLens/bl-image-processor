@@ -114,6 +114,7 @@ def set_product_is_unavailable(product):
   try:
     p = {}
     p['is_available'] = False
+    p['is_processed'] = True
     product_api.update_product_by_id(str(product['_id']), p)
   except Exception as e:
     log.error(str(e))
@@ -226,7 +227,7 @@ def dispatch_job(rconn):
 
 if __name__ == '__main__':
   try:
-    log.info('Start bl-image-processor:3')
+    log.info('Start bl-image-processor:4')
     dispatch_job(rconn)
   except Exception as e:
     log.error(str(e))
